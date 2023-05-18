@@ -1,0 +1,18 @@
+/*
+ * CaseReviews extension styles
+*/
+
+div.car-summary-header {
+	margin-top:-.9em;
+	font-size: 90%;
+	font-style: italic;
+}
+
+.summary-link {
+
+	display: block;
+}
+
+/* .car-entry p br {
+	display: none;
+} */
