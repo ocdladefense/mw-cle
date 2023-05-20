@@ -1,5 +1,5 @@
 {
-    "name": "ocdladefense/mw-car",
+    "name": "ocdladefense/mw-cle",
     "type": "wordpress-theme",
     "description": "A MediaWiki extension for showing recently published case reviews",
     "config": {
@@ -8,9 +8,7 @@
         }
     },
     "require": {
-        "ocdladefense/lib-database":"~1.0",
         "ocdladefense/lib-oauth-config": "~2.0",
-        "ocdladefense/lib-salesforce-rest-api":"~3.0",
-        "ocdladefense/lib-http":"~3.0"
+        "ocdladefense/lib-salesforce-rest-api":"~3.0"
     }
 }
