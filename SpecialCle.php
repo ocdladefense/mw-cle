@@ -108,7 +108,7 @@ class SpecialCle extends SpecialPage {
 		$output = $this->getOutput();
 
 		try {
-			$records = self::queryProducts(2021);
+			$records = self::queryProducts($params);
 			$rows = array_map(function($elem) { 
 				$id = $elem["Id"];
 				$date = $elem["Start_Date__c"];
