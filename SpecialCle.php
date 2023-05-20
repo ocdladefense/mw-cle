@@ -1,5 +1,13 @@
 <?php
 
+use Http as Http;
+use Http\HttpHeader as HttpHeader; 
+use Http\AcceptHeader as AcceptHeader; 
+use Http\HttpResponse as HttpResponse;
+use Http\HttpRequest as HttpRequest;
+use Http\HttpHeaderCollection;
+use Salesforce\OAuth;
+use Salesforce\OAuthException;
 use \Salesforce\RestApiRequest;
 use Ocdla\Template;
 
@@ -17,43 +25,34 @@ class SpecialCle extends SpecialPage {
     }
 
 
-	private function authenticate() {
+	private static function authenticate() {
 		global $oauth_config;
 		$config = new Salesforce\OAuthConfig($oauth_config);
-		Application::writeCredentialsToCache($config);
+
+        $flow = "usernamepassword";
+
+        $httpMessage = OAuth::start($config, $flow);
+
+        $resp = $httpMessage->authorize();
+
+        if(!$resp->isSuccess()) throw new OAuthException($resp->getErrorMessage());
+
+        $url = $resp->getInstanceUrl();
+        $token = $resp->getAccessToken();
+        // var_dump($url, $token );exit;
+        // CoreModule::setSession($config->getName(), $flow, $oauthResp->getInstanceUrl(), $oauthResp->getAccessToken());
+        cache_set("instance_url", $url);
+        cache_set("access_token", $token); 
+
+		// Application::writeCredentialsToCache($config);
+		return array($url,$token);
 	}
-	// Needs to use application-level credentials.
+	
+
+	
 	// select Event__r.Start_Date__c, Title__c, Event__r.Name from Chapter__c where Title__c LIKE '%jury%' 
 	private static function queryProducts($year) {
 
-
-		$accessToken = cache_get("access_token");
-		$instanceUrl = cache_get("instance_url");
-
-		if(empty($accessToken) || empty($instanceUrl)) {
-			self::authenticate();
-		}
-
-
-		try {
-			// If the access token has been removed from the session, return false...for now.  (Need a better solution)
-		
-			$api = new RestApiRequest($instanceUrl, $accessToken);
-		} catch(\Exception $e) {
-			if(get_class($e) == "Http\HttpClientException") {
-
-				if(function_exists("opcache_invalidate")) {
-					$result = opcache_invalidate(CACHE_DIR . "/access_token", true);
-					$result = opcache_invalidate(CACHE_DIR . "/instance_url", true);
-				}
-
-				cache_delete("access_token");
-				cache_delete("instance_url");
-
-				// return $this->runHttp($req);
-				return self::queryProducts($year);
-			}
-		}
 
 		// Subscription should last only a year, but we dont have a reliable way of determining expiration.
 		//$query = "SELECT Id FROM OrderItem WHERE Contact__c = '$contactId' AND RealExpirationDate__c > $today AND Product2id IN($soqlProdIds)";
@@ -61,15 +60,51 @@ class SpecialCle extends SpecialPage {
 		// $query = "SELECT Event__r.Start_Date__c, Title__c, Event__r.Name FROM Chapter__c where Title__c LIKE '%jury%'";
 
 
-		$resp = $api->query($query);
+		$token = cache_get("access_token");
+		$url = cache_get("instance_url");
 
+		if(empty($token) || empty($url)) {
+			list($url,$token) = self::authenticate();
+		}
+
+
+		try {
+			// If the access token has been removed from the session, return false...for now.  (Need a better solution)
+		
+			$api = new RestApiRequest($url, $token);
+			$resp = $api->query($query);
+
+			if(!$resp->success()) {
+				throw new \Exception("foobar");
+			}
+		} catch(\Exception $e) {
+
+			if(function_exists("opcache_invalidate")) {
+				$result = opcache_invalidate(CACHE_DIR . "/access_token", true);
+				$result = opcache_invalidate(CACHE_DIR . "/instance_url", true);
+			}
+
+			cache_delete("access_token");
+			cache_delete("instance_url");
+
+			// return $this->runHttp($req);
+			return self::queryProducts($year);
+		}
+
+
+		// var_dump($resp);exit;
 		// if(!$resp->success()) throw new \Exception($resp->getErrorMessage());
 
-		return $resp->success() && count($resp->getRecords()) > 0 ? $resp->getRecords() : "No CLEs found for this query.";	
+		return $resp->success() && count($resp->getRecords()) > 0 ? $resp->getRecords() : array();
 	}
 
 
 	public function execute($params) {
+
+		// var_dump($params); exit;
+
+		// cache_set("foobar","baz");
+		
 		$output = $this->getOutput();
 
 		try {
@@ -77,18 +112,14 @@ class SpecialCle extends SpecialPage {
 			$rows = array_map(function($elem) { 
 				$id = $elem["Id"];
 				$date = $elem["Start_Date__c"];
-			$titleDate = new DateTime($date);
-			$titleDate = $titleDate->format("F jS, Y");
+				$titleDate = new DateTime($date);
+				$titleDate = $titleDate->format("F jS, Y");
 				return "<a href='/CLE/{$id}'>" . $elem["Name"] . "</a> - {$titleDate}";
 			}, $records);
 			$html = "<ul><li>" . implode("</li><li>", $rows) . "</ul></li>";
 		} catch(\Exception $e) {
 			$html = $e->getMessage();
 		}
-		
-
-
-		
 
 		$output->addHTML($html);
 	}
