@@ -17,18 +17,43 @@ class SpecialCle extends SpecialPage {
     }
 
 
+	private function authenticate() {
+		global $oauth_config;
+		$config = new Salesforce\OAuthConfig($oauth_config);
+		Application::writeCredentialsToCache($config);
+	}
 	// Needs to use application-level credentials.
 	// select Event__r.Start_Date__c, Title__c, Event__r.Name from Chapter__c where Title__c LIKE '%jury%' 
 	private static function queryProducts($year) {
 
-		$accessToken = $_SESSION["access-token"];
-		$instanceUrl = $_SESSION["instance-url"];
 
-		// If the access token has been removed from the session, return false...for now.  (Need a better solution)
-		if(empty($accessToken) || empty($instanceUrl)) return false;
+		$accessToken = cache_get("access_token");
+		$instanceUrl = cache_get("instance_url");
+
+		if(empty($accessToken) || empty($instanceUrl)) {
+			self::authenticate();
+		}
+
+
+		try {
+			// If the access token has been removed from the session, return false...for now.  (Need a better solution)
 		
-		$api = new RestApiRequest($instanceUrl, $accessToken);
+			$api = new RestApiRequest($instanceUrl, $accessToken);
+		} catch(\Exception $e) {
+			if(get_class($e) == "Http\HttpClientException") {
 
+				if(function_exists("opcache_invalidate")) {
+					$result = opcache_invalidate(CACHE_DIR . "/access_token", true);
+					$result = opcache_invalidate(CACHE_DIR . "/instance_url", true);
+				}
+
+				cache_delete("access_token");
+				cache_delete("instance_url");
+
+				// return $this->runHttp($req);
+				return self::queryProducts($year);
+			}
+		}
 
 		// Subscription should last only a year, but we dont have a reliable way of determining expiration.
 		//$query = "SELECT Id FROM OrderItem WHERE Contact__c = '$contactId' AND RealExpirationDate__c > $today AND Product2id IN($soqlProdIds)";
