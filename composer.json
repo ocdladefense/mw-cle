@@ -10,6 +10,7 @@
     "require": {
         "ocdladefense/lib-oauth-config": "~2.0",
         "ocdladefense/lib-salesforce-rest-api":"~3.0",
-	"ocdladefense/mw-php-framework":"dev-main"
+	"ocdladefense/mw-php-framework":"dev-main",
+        "ocdladefense/lib-php-template": "dev-development"
     }
 }
